@@ -1,6 +1,6 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { DownloadPanel } from '@/components/wizard/download-panel';
 import { FileDropZone } from '@/components/wizard/file-drop-zone';
@@ -19,6 +19,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function Import() {
+    const { auth } = usePage().props as {
+        auth: { subscribed?: boolean };
+    };
+    const isSubscribed = !!auth?.subscribed;
     const containerRef = useRef<HTMLDivElement>(null);
 
     const scrollToTop = useCallback(() => {
@@ -47,8 +51,18 @@ export default function Import() {
         handleApplyMapping,
         handleGenerate,
         handleReset,
+        resumeImport,
         scrollUp,
     } = useWizard(scrollToTop);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const resumeId = params.get('resume');
+        if (resumeId) {
+            resumeImport(resumeId);
+            window.history.replaceState({}, '', '/import');
+        }
+    }, [resumeImport]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -92,6 +106,7 @@ export default function Import() {
                                 >
                                     <FileDropZone
                                         onUploadComplete={handleUploadComplete}
+                                        acceptPremiumFormats={isSubscribed}
                                     />
                                 </motion.div>
                             )}
@@ -114,6 +129,7 @@ export default function Import() {
                                         onApply={handleApplyMapping}
                                         isLoadingAi={isLoadingAi}
                                         isApplying={isApplying}
+                                        canUseAi={isSubscribed}
                                     />
                                 </motion.div>
                             )}

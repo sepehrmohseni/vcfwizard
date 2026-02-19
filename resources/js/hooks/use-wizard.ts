@@ -65,7 +65,7 @@ export function useWizard(scrollToTop?: () => void) {
             setSuggestions(data.suggestions);
             const autoMapping: Record<string, string> = {};
             data.suggestions.forEach((s: AiSuggestion) => {
-                if (s.confidence >= 0.5)
+                if (s.confidence >= 50)
                     autoMapping[s.column_name] = s.field_type;
             });
             setMapping((prev) => ({ ...prev, ...autoMapping }));
@@ -202,6 +202,43 @@ export function useWizard(scrollToTop?: () => void) {
         if (pollingRef.current) clearInterval(pollingRef.current);
     }, []);
 
+    const resumeImport = useCallback(
+        async (importUlid: string) => {
+            setError(null);
+            try {
+                const res = await fetch(
+                    `/wizard/resume?import_ulid=${encodeURIComponent(importUlid)}`,
+                    { headers: { Accept: 'application/json' } },
+                );
+                if (!res.ok) {
+                    const data = await res.json().catch(() => null);
+                    throw new Error(
+                        data?.error || 'Failed to resume import.',
+                    );
+                }
+                const data = await res.json();
+                setImportId(data.import_ulid);
+                setHeaders(data.headers);
+                setPreviewRows(data.preview_rows);
+                setTotalRows(data.total_rows);
+                if (data.suggestions) setSuggestions(data.suggestions);
+                if (data.mapping) {
+                    setMapping(data.mapping);
+                    setDuplicatesFound(data.duplicates_found ?? 0);
+                }
+                setStep(data.step as WizardStep);
+                scrollUp();
+            } catch (e) {
+                setError(
+                    e instanceof Error
+                        ? e.message
+                        : 'Failed to resume import.',
+                );
+            }
+        },
+        [scrollUp],
+    );
+
     return {
         step,
         setStep,
@@ -224,6 +261,7 @@ export function useWizard(scrollToTop?: () => void) {
         handleApplyMapping,
         handleGenerate,
         handleReset,
+        resumeImport,
         scrollUp,
     };
 }

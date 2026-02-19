@@ -29,6 +29,11 @@ class Import extends Model
         'duplicate_details',
         'error_message',
         'processed_at',
+        'ai_enabled',
+        'ai_rows_processed',
+        'is_priority',
+        'source',
+        'integration_id',
     ];
 
     protected function casts(): array
@@ -42,6 +47,9 @@ class Import extends Model
             'file_size' => 'integer',
             'duplicates_found' => 'integer',
             'processed_at' => 'datetime',
+            'ai_enabled' => 'boolean',
+            'ai_rows_processed' => 'integer',
+            'is_priority' => 'boolean',
         ];
     }
 
@@ -58,6 +66,11 @@ class Import extends Model
     public function export(): HasOne
     {
         return $this->hasOne(Export::class);
+    }
+
+    public function integration(): BelongsTo
+    {
+        return $this->belongsTo(Integration::class);
     }
 
     public function isGuest(): bool

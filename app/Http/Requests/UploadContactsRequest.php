@@ -16,12 +16,14 @@ class UploadContactsRequest extends FormRequest
      */
     public function rules(): array
     {
+        $allowedMimes = 'csv,xlsx,xls,txt,json';
+
         return [
             'file' => [
                 'required',
                 'file',
                 'max:10240',
-                'mimes:csv,xlsx,xls,txt',
+                "mimes:{$allowedMimes}",
             ],
         ];
     }
@@ -34,7 +36,7 @@ class UploadContactsRequest extends FormRequest
         return [
             'file.required' => 'Please select a file to upload.',
             'file.max' => 'File size must not exceed 10MB.',
-            'file.mimes' => 'Only CSV and Excel files are supported.',
+            'file.mimes' => 'Supported formats: CSV, Excel, TXT, and JSON.',
         ];
     }
 }

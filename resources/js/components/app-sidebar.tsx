@@ -1,5 +1,5 @@
-import { Link } from '@inertiajs/react';
-import { Clock, LayoutGrid, Map, PlusCircle } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { Clock, CreditCard, Key, LayoutGrid, Map, Plug, PlusCircle, Webhook } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -38,7 +38,47 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
+const proNavItems: NavItem[] = [
+    {
+        title: 'Billing',
+        href: '/billing',
+        icon: CreditCard,
+    },
+    {
+        title: 'Integrations',
+        href: '/integrations',
+        icon: Plug,
+    },
+    {
+        title: 'Webhooks',
+        href: '/webhooks',
+        icon: Webhook,
+    },
+    {
+        title: 'API Keys',
+        href: '/api-keys',
+        icon: Key,
+    },
+];
+
 export function AppSidebar() {
+    const { auth } = usePage().props as {
+        auth: { subscribed?: boolean };
+    };
+    const subscribed = auth?.subscribed ?? false;
+
+    const extraItems: NavItem[] = [
+        {
+            title: 'Billing',
+            href: '/billing',
+            icon: CreditCard,
+        },
+    ];
+
+    const navItems = subscribed
+        ? [...mainNavItems, ...proNavItems]
+        : [...mainNavItems, ...extraItems];
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -54,7 +94,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={navItems} />
             </SidebarContent>
 
             <SidebarFooter>

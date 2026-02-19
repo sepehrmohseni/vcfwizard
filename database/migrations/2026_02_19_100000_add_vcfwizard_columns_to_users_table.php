@@ -9,10 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('stripe_customer_id')->nullable()->after('remember_token');
-            $table->string('subscription_status')->default('free')->after('stripe_customer_id');
-            $table->unsignedBigInteger('contacts_processed_this_month')->default(0)->after('subscription_status');
-            $table->timestamp('current_period_started_at')->nullable()->after('contacts_processed_this_month');
+            $table->unsignedBigInteger('ai_rows_used')->default(0)->after('remember_token');
+            $table->timestamp('ai_usage_reset_at')->nullable()->after('ai_rows_used');
         });
     }
 
@@ -20,10 +18,8 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->dropColumn([
-                'stripe_customer_id',
-                'subscription_status',
-                'contacts_processed_this_month',
-                'current_period_started_at',
+                'ai_rows_used',
+                'ai_usage_reset_at',
             ]);
         });
     }

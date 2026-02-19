@@ -15,7 +15,11 @@ class MappingTemplate extends Model
         'user_id',
         'name',
         'mapping',
+        'description',
+        'category',
         'is_public',
+        'is_premium',
+        'price',
         'usage_count',
     ];
 
@@ -24,6 +28,8 @@ class MappingTemplate extends Model
         return [
             'mapping' => 'array',
             'is_public' => 'boolean',
+            'is_premium' => 'boolean',
+            'price' => 'decimal:2',
             'usage_count' => 'integer',
         ];
     }

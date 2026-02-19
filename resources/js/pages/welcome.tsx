@@ -24,9 +24,10 @@ export default function Welcome({
     canRegister?: boolean;
 }) {
     const { auth } = usePage().props as {
-        auth: { user: { name: string } | null };
+        auth: { user: { name: string } | null; subscribed?: boolean };
     };
     const isLoggedIn = !!auth?.user;
+    const isSubscribed = !!auth?.subscribed;
 
     const [step, setStep] = useState<WizardStep>('upload');
     const [importId, setImportId] = useState<string | null>(null);
@@ -88,7 +89,7 @@ export default function Welcome({
             setSuggestions(data.suggestions);
             const autoMapping: Record<string, string> = {};
             data.suggestions.forEach((s: AiSuggestion) => {
-                if (s.confidence >= 0.5)
+                if (s.confidence >= 50)
                     autoMapping[s.column_name] = s.field_type;
             });
             setMapping((prev) => ({ ...prev, ...autoMapping }));
@@ -405,6 +406,7 @@ export default function Welcome({
                                                 onUploadComplete={
                                                     handleUploadComplete
                                                 }
+                                                acceptPremiumFormats={isSubscribed}
                                             />
                                         </motion.div>
                                     )}
@@ -427,6 +429,7 @@ export default function Welcome({
                                                 onApply={handleApplyMapping}
                                                 isLoadingAi={isLoadingAi}
                                                 isApplying={isApplying}
+                                                canUseAi={isLoggedIn && isSubscribed}
                                             />
                                         </motion.div>
                                     )}
@@ -560,6 +563,28 @@ export default function Welcome({
                                         </p>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="border-t border-neutral-200 py-16 sm:py-24 dark:border-neutral-800">
+                        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+                            <h2 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl dark:text-white">
+                                Need more power?
+                            </h2>
+                            <p className="mt-4 text-neutral-600 dark:text-neutral-400">
+                                Upgrade to Pro for AI-powered mapping, unlimited contacts,
+                                Google Sheets integration, webhooks, and API access.
+                            </p>
+                            <div className="mt-4 text-3xl font-bold text-blue-600">
+                                $10 <span className="text-base font-normal text-neutral-500">/ 6 months</span>
+                            </div>
+                            <div className="mt-6">
+                                <Link href="/pricing">
+                                    <Button size="lg" variant="outline">
+                                        View Pricing
+                                    </Button>
+                                </Link>
                             </div>
                         </div>
                     </section>

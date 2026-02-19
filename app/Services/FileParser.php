@@ -21,6 +21,8 @@ class FileParser
         return match ($extension) {
             'csv' => $this->parseCsv($file),
             'xlsx', 'xls' => $this->parseExcel($file),
+            'txt' => $this->parseTxt($file),
+            'json' => $this->parseJson($file),
             default => throw new \InvalidArgumentException("Unsupported file type: {$extension}"),
         };
     }
@@ -35,6 +37,8 @@ class FileParser
         return match ($extension) {
             'csv' => $this->parseCsvFromPath($path),
             'xlsx', 'xls' => $this->parseExcelFromPath($path),
+            'txt' => $this->parseTxtFromPath($path),
+            'json' => $this->parseJsonFromPath($path),
             default => throw new \InvalidArgumentException("Unsupported file type: {$extension}"),
         };
     }
@@ -144,5 +148,141 @@ class FileParser
         $header = preg_replace('/\s+/', ' ', $header);
 
         return Str::limit($header, 50, '');
+    }
+
+    /**
+     * @return array{headers: array<string>, rows: array<array<string, string>>, total_rows: int}
+     */
+    private function parseTxt(UploadedFile $file): array
+    {
+        return $this->parseTxtFromPath($file->getRealPath());
+    }
+
+    /**
+     * @return array{headers: array<string>, rows: array<array<string, string>>, total_rows: int}
+     */
+    private function parseTxtFromPath(string $path): array
+    {
+        $content = file_get_contents($path);
+        if ($content === false) {
+            throw new \RuntimeException('Failed to read TXT file.');
+        }
+
+        $lines = preg_split('/\R/', $content);
+        $lines = array_filter($lines, fn ($l) => trim($l) !== '');
+
+        if (empty($lines)) {
+            throw new \RuntimeException('TXT file is empty.');
+        }
+
+        $firstLine = reset($lines);
+        $delimiter = $this->detectDelimiter($firstLine);
+
+        $headers = array_map(
+            fn ($h) => $this->sanitizeHeader($h),
+            str_getcsv($firstLine, $delimiter)
+        );
+
+        $rows = [];
+        $isFirst = true;
+        foreach ($lines as $line) {
+            if ($isFirst) {
+                $isFirst = false;
+
+                continue;
+            }
+            $parsed = str_getcsv($line, $delimiter);
+            if (count($parsed) === count($headers)) {
+                $rows[] = array_combine($headers, $parsed);
+            }
+        }
+
+        return [
+            'headers' => $headers,
+            'rows' => $rows,
+            'total_rows' => count($rows),
+        ];
+    }
+
+    private function detectDelimiter(string $line): string
+    {
+        $delimiters = ["\t" => 0, '|' => 0, ';' => 0, ',' => 0];
+
+        foreach (array_keys($delimiters) as $d) {
+            $delimiters[$d] = substr_count($line, $d);
+        }
+
+        return array_keys($delimiters, max($delimiters))[0];
+    }
+
+    /**
+     * @return array{headers: array<string>, rows: array<array<string, string>>, total_rows: int}
+     */
+    private function parseJson(UploadedFile $file): array
+    {
+        return $this->parseJsonFromPath($file->getRealPath());
+    }
+
+    /**
+     * @return array{headers: array<string>, rows: array<array<string, string>>, total_rows: int}
+     */
+    private function parseJsonFromPath(string $path): array
+    {
+        $content = file_get_contents($path);
+        if ($content === false) {
+            throw new \RuntimeException('Failed to read JSON file.');
+        }
+
+        $data = json_decode($content, true);
+
+        if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
+            $lines = preg_split('/\R/', trim($content));
+            $data = [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '') {
+                    continue;
+                }
+                $decoded = json_decode($line, true);
+                if (is_array($decoded)) {
+                    $data[] = $decoded;
+                }
+            }
+        }
+
+        if (! is_array($data) || empty($data)) {
+            throw new \RuntimeException('JSON file contains no valid data.');
+        }
+
+        if (isset($data[0]) && is_array($data[0])) {
+            $records = $data;
+        } else {
+            $records = [$data];
+        }
+
+        $headers = array_map(
+            fn ($h) => $this->sanitizeHeader((string) $h),
+            array_keys($records[0])
+        );
+
+        $rows = array_map(fn ($record) => array_combine(
+            $headers,
+            array_map('strval', array_values(array_pad(
+                array_intersect_key($record, array_flip(array_keys($records[0]))),
+                count($headers),
+                ''
+            )))
+        ), $records);
+
+        return [
+            'headers' => $headers,
+            'rows' => $rows,
+            'total_rows' => count($rows),
+        ];
+    }
+
+    public static function isPremiumFormat(string $extension): bool
+    {
+        return in_array(strtolower($extension), ['txt', 'json']);
     }
 }

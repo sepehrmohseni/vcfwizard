@@ -71,7 +71,7 @@ export default function Templates({ templates }: Props) {
                                                             template.mapping,
                                                         ).length
                                                     }{' '}
-                                                    fields mapped
+                                                    {Object.keys(template.mapping).length === 1 ? 'field' : 'fields'} mapped
                                                 </p>
                                             </div>
                                             {template.is_public && (
@@ -110,7 +110,7 @@ export default function Templates({ templates }: Props) {
                                         <div className="mt-4 flex items-center justify-between">
                                             <span className="text-xs text-neutral-400">
                                                 Used {template.usage_count}{' '}
-                                                times
+                                                {template.usage_count === 1 ? 'time' : 'times'}
                                             </span>
                                             <Button
                                                 variant="ghost"

@@ -8,6 +8,7 @@ use App\Services\DuplicateDetector;
 use App\Services\FileParser;
 use App\Services\PhoneNormalizer;
 use App\Services\VcfGenerator;
+use App\Services\WebhookDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -73,12 +74,30 @@ class ProcessImportJob implements ShouldQueue
             ]);
 
             $this->import->markAsCompleted();
+
+            if ($this->import->user_id) {
+                $export = $this->import->export;
+                app(WebhookDispatcher::class)->dispatch($this->import->user, 'import.completed', [
+                    'import_id' => $this->import->id,
+                    'export_id' => $export->id,
+                    'filename' => $export->filename,
+                    'contact_count' => $export->contact_count,
+                    'download_url' => url("/wizard/download/{$export->id}"),
+                ]);
+            }
         } catch (\Throwable $e) {
             Log::error('Import processing failed', [
                 'import_id' => $this->import->id,
                 'error' => $e->getMessage(),
             ]);
             $this->import->markAsFailed($e->getMessage());
+
+            if ($this->import->user_id) {
+                app(WebhookDispatcher::class)->dispatch($this->import->user, 'import.failed', [
+                    'import_id' => $this->import->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             throw $e;
         }

@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Attributes\UseCheapestModel;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Promptable;
 
+#[UseCheapestModel]
 class NameCleanupAgent implements Agent, HasStructuredOutput
 {
     use Promptable;

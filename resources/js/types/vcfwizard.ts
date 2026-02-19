@@ -162,6 +162,63 @@ export const VCARD_FIELD_OPTIONS: {
 export type DashboardStats = {
     total_imports: number;
     total_contacts: number;
-    contacts_this_month: number;
     total_exports: number;
+    ai_rows_used: number;
+    ai_rows_limit: number;
+};
+
+export type IntegrationRecord = {
+    id: string;
+    type: string;
+    name: string;
+    is_active: boolean;
+    token_expired: boolean;
+    metadata: Record<string, unknown> | null;
+    created_at: string;
+};
+
+export type WebhookRecord = {
+    id: string;
+    name: string;
+    url: string;
+    events: string[];
+    is_active: boolean;
+    failure_count: number;
+    last_triggered_at: string | null;
+    deliveries_count?: number;
+    created_at: string;
+};
+
+export type WebhookDeliveryRecord = {
+    id: string;
+    event: string;
+    payload: Record<string, unknown>;
+    response_code: number | null;
+    response_body: string | null;
+    attempt: number;
+    status: string;
+    delivered_at: string | null;
+    created_at: string;
+};
+
+export type ApiKeyRecord = {
+    id: string;
+    name: string;
+    key_prefix: string;
+    usage_count: number;
+    last_used_at: string | null;
+    expires_at: string | null;
+    created_at: string;
+};
+
+export type SubscriptionInfo = {
+    stripe_status: string;
+    ends_at: string | null;
+    trial_ends_at: string | null;
+} | null;
+
+export type AiUsage = {
+    used: number;
+    limit: number;
+    resetsAt: string | null;
 };

@@ -13,9 +13,10 @@ import type { UploadResponse } from '@/types/vcfwizard';
 
 type FileDropZoneProps = {
     onUploadComplete: (data: UploadResponse) => void;
+    acceptPremiumFormats?: boolean;
 };
 
-export function FileDropZone({ onUploadComplete }: FileDropZoneProps) {
+export function FileDropZone({ onUploadComplete, acceptPremiumFormats = false }: FileDropZoneProps) {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
@@ -70,14 +71,19 @@ export function FileDropZone({ onUploadComplete }: FileDropZoneProps) {
         [onUploadComplete],
     );
 
+    const acceptedTypes: Record<string, string[]> = {
+        'text/csv': ['.csv'],
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+        'application/vnd.ms-excel': ['.xls'],
+        ...(acceptPremiumFormats ? {
+            'text/plain': ['.txt'],
+            'application/json': ['.json'],
+        } : {}),
+    };
+
     const { getRootProps, getInputProps } = useDropzone({
         onDrop,
-        accept: {
-            'text/csv': ['.csv'],
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-                ['.xlsx'],
-            'application/vnd.ms-excel': ['.xls'],
-        },
+        accept: acceptedTypes,
         maxFiles: 1,
         maxSize: 10 * 1024 * 1024,
         disabled: isUploading,
@@ -167,7 +173,7 @@ export function FileDropZone({ onUploadComplete }: FileDropZoneProps) {
                                     Drop your contacts file here
                                 </p>
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    or click to browse &middot; CSV, XLSX up to
+                                    or click to browse &middot; {acceptPremiumFormats ? 'CSV, XLSX, TXT, JSON' : 'CSV, XLSX'} up to
                                     10MB
                                 </p>
                             </div>
@@ -178,6 +184,16 @@ export function FileDropZone({ onUploadComplete }: FileDropZoneProps) {
                                 <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium">
                                     <FileSpreadsheet className="h-3 w-3" /> XLSX
                                 </span>
+                                {acceptPremiumFormats && (
+                                    <>
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                                            <FileSpreadsheet className="h-3 w-3" /> TXT
+                                        </span>
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                                            <FileSpreadsheet className="h-3 w-3" /> JSON
+                                        </span>
+                                    </>
+                                )}
                             </div>
                         </motion.div>
                     )}

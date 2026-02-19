@@ -23,6 +23,9 @@ class Export extends Model
         'expires_at',
         'public_token',
         'is_public',
+        'delivery_method',
+        'delivery_config',
+        'delivery_status',
     ];
 
     protected function casts(): array
@@ -32,6 +35,7 @@ class Export extends Model
             'download_count' => 'integer',
             'expires_at' => 'datetime',
             'is_public' => 'boolean',
+            'delivery_config' => 'array',
         ];
     }
 

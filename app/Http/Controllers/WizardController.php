@@ -7,10 +7,12 @@ use App\Http\Requests\GenerateVcfRequest;
 use App\Http\Requests\UploadContactsRequest;
 use App\Jobs\ProcessImportJob;
 use App\Models\Import;
+use App\Models\MappingTemplate;
 use App\Services\ContactMappingAgent;
 use App\Services\DuplicateDetector;
 use App\Services\FileParser;
 use App\Services\VcfGenerator;
+use App\Services\WebhookDispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -21,19 +23,29 @@ class WizardController extends Controller
     public function upload(UploadContactsRequest $request, FileParser $parser): JsonResponse
     {
         $file = $request->file('file');
-        $path = $file->store('imports', 'local');
+        $extension = strtolower($file->getClientOriginalExtension());
 
+        if (FileParser::isPremiumFormat($extension) && ! $request->user()?->isPro()) {
+            return response()->json([
+                'error' => 'This file format requires a VCFWizard Pro subscription.',
+            ], 403);
+        }
+
+        $path = $file->store('imports', 'local');
         $parsed = $parser->parse($file);
 
         $import = Import::create([
             'user_id' => $request->user()?->id,
             'original_filename' => $file->getClientOriginalName(),
             'file_path' => $path,
-            'file_type' => $file->getClientOriginalExtension(),
+            'file_type' => $extension,
             'file_size' => $file->getSize(),
             'row_count' => $parsed['total_rows'],
             'column_headers' => $parsed['headers'],
             'status' => 'pending',
+            'ai_enabled' => $request->boolean('ai_enabled', false),
+            'is_priority' => $request->user()?->isPro() ?? false,
+            'source' => 'upload',
         ]);
 
         if (! $request->user()) {
@@ -56,15 +68,37 @@ class WizardController extends Controller
             'import_ulid' => ['required', 'string', 'exists:imports,id'],
         ]);
 
+        $user = $request->user();
+        if (! $user || ! $user->canUseAi()) {
+            return response()->json([
+                'error' => 'AI mapping requires an active Pro subscription.',
+                'upgrade_url' => route('billing.index'),
+            ], 403);
+        }
+
+        $user->resetAiUsageIfNeeded();
+
         $import = Import::findOrFail($request->input('import_ulid'));
         $parser = new FileParser;
         $fullPath = Storage::disk('local')->path($import->file_path);
         $parsed = $parser->parseFromPath($fullPath);
         $previewRows = $parser->getPreviewRows($parsed['rows']);
 
-        $result = $agent->analyze($parsed['headers'], $previewRows);
+        try {
+            $result = $agent->analyze($parsed['headers'], $previewRows);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => 'AI mapping temporarily unavailable. Please map columns manually.',
+            ], 503);
+        }
 
-        $import->update(['ai_suggestions' => $result['mappings']]);
+        $import->update([
+            'ai_suggestions' => $result['mappings'],
+            'ai_enabled' => true,
+            'ai_rows_processed' => count($previewRows),
+        ]);
+
+        $user->incrementAiUsage(count($previewRows));
 
         return response()->json([
             'suggestions' => $result['mappings'],
@@ -75,9 +109,20 @@ class WizardController extends Controller
     {
         $import = Import::findOrFail($request->input('import_ulid'));
 
+        $this->authorizeImportAccess($request, $import);
+
+        $mappingData = $request->input('mapping');
+
         $import->update([
-            'mapped_fields' => $request->input('mapping'),
+            'mapped_fields' => $mappingData,
         ]);
+
+        if ($request->user()) {
+            MappingTemplate::where('user_id', $request->user()->id)
+                ->get()
+                ->filter(fn (MappingTemplate $t) => $t->mapping == $mappingData)
+                ->each(fn (MappingTemplate $t) => $t->increment('usage_count'));
+        }
 
         $parser = new FileParser;
         $fullPath = Storage::disk('local')->path($import->file_path);
@@ -101,6 +146,9 @@ class WizardController extends Controller
     public function generate(GenerateVcfRequest $request): JsonResponse
     {
         $import = Import::findOrFail($request->input('import_ulid'));
+
+        $this->authorizeImportAccess($request, $import);
+
         $mapping = $import->mapped_fields;
 
         if (empty($mapping)) {
@@ -112,7 +160,8 @@ class WizardController extends Controller
         $parsed = $parser->parseFromPath($fullPath);
 
         if ($parsed['total_rows'] > 500) {
-            ProcessImportJob::dispatch($import);
+            $queue = $import->is_priority ? 'priority' : 'default';
+            ProcessImportJob::dispatch($import)->onQueue($queue);
 
             return response()->json([
                 'status' => 'queued',
@@ -175,12 +224,70 @@ class WizardController extends Controller
             ]);
         }
 
+        if ($import->user_id) {
+            app(WebhookDispatcher::class)->dispatch($import->user, 'import.completed', [
+                'import_id' => $import->id,
+                'export_id' => $export->id,
+                'filename' => $export->filename,
+                'contact_count' => $export->contact_count,
+                'download_url' => url("/wizard/download/{$export->id}"),
+            ]);
+        }
+
         return response()->json([
             'status' => 'completed',
             'export_ulid' => $export->id,
             'filename' => $export->filename,
             'contact_count' => $export->contact_count,
         ]);
+    }
+
+    public function resume(Request $request): JsonResponse
+    {
+        $request->validate([
+            'import_ulid' => ['required', 'string', 'exists:imports,id'],
+        ]);
+
+        $import = Import::findOrFail($request->input('import_ulid'));
+
+        $this->authorizeImportAccess($request, $import);
+
+        if (! in_array($import->status, ['pending', 'processing'])) {
+            return response()->json([
+                'error' => 'This import cannot be resumed.',
+            ], 422);
+        }
+
+        if (! Storage::disk('local')->exists($import->file_path)) {
+            return response()->json([
+                'error' => 'Source file no longer available.',
+            ], 404);
+        }
+
+        $parser = new FileParser;
+        $fullPath = Storage::disk('local')->path($import->file_path);
+        $parsed = $parser->parseFromPath($fullPath);
+
+        $step = $import->mapped_fields ? 'preview' : 'mapping';
+
+        $response = [
+            'import_ulid' => $import->id,
+            'headers' => $parsed['headers'],
+            'preview_rows' => $parser->getPreviewRows($parsed['rows']),
+            'total_rows' => $parsed['total_rows'],
+            'step' => $step,
+        ];
+
+        if ($import->mapped_fields) {
+            $response['mapping'] = $import->mapped_fields;
+            $response['duplicates_found'] = $import->duplicates_found ?? 0;
+        }
+
+        if ($import->ai_suggestions) {
+            $response['suggestions'] = $import->ai_suggestions;
+        }
+
+        return response()->json($response);
     }
 
     public function status(Request $request): JsonResponse
@@ -190,6 +297,8 @@ class WizardController extends Controller
         ]);
 
         $import = Import::findOrFail($request->input('import_ulid'));
+
+        $this->authorizeImportAccess($request, $import);
 
         $response = [
             'status' => $import->status,
@@ -212,9 +321,13 @@ class WizardController extends Controller
         return response()->json($response);
     }
 
-    public function download(string $exportUlid): StreamedResponse
+    public function download(Request $request, string $exportUlid): StreamedResponse
     {
         $export = \App\Models\Export::findOrFail($exportUlid);
+
+        if ($export->user_id !== null && $export->user_id !== $request->user()?->id) {
+            abort(403);
+        }
 
         if ($export->isExpired()) {
             abort(410, 'This download link has expired.');
@@ -256,5 +369,21 @@ class WizardController extends Controller
             $export->filename,
             ['Content-Type' => $contentType]
         );
+    }
+
+    private function authorizeImportAccess(Request $request, Import $import): void
+    {
+        if ($import->user_id !== null) {
+            if ($import->user_id !== $request->user()?->id) {
+                abort(403);
+            }
+
+            return;
+        }
+
+        $guestImports = $request->session()->get('guest_imports', []);
+        if (! in_array($import->id, $guestImports)) {
+            abort(403);
+        }
     }
 }

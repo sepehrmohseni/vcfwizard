@@ -23,13 +23,15 @@ class DashboardController extends Controller
         $stats = [
             'total_imports' => Import::where('user_id', $user->id)->count(),
             'total_contacts' => Import::where('user_id', $user->id)->sum('row_count'),
-            'contacts_this_month' => $user->contacts_processed_this_month,
             'total_exports' => Export::where('user_id', $user->id)->count(),
+            'ai_rows_used' => $user->ai_rows_used,
+            'ai_rows_limit' => $user->ai_rows_limit,
         ];
 
         return Inertia::render('dashboard', [
             'recentImports' => $recentImports,
             'stats' => $stats,
+            'subscribed' => $user->isPro(),
         ]);
     }
 }

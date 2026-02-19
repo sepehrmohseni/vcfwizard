@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Eye, Loader2, PlusCircle } from 'lucide-react';
+import { ArrowRight, Eye, Loader2, PlusCircle } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -221,6 +221,19 @@ export default function History({ imports }: Props) {
                                                                 </Button>
                                                             </a>
                                                         ) : null}
+                                                        {imp.status === 'pending' && (
+                                                            <Link
+                                                                href={`/import?resume=${imp.id}`}
+                                                            >
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="h-8 gap-1.5"
+                                                                >
+                                                                    <ArrowRight className="h-3.5 w-3.5" />
+                                                                    Continue
+                                                                </Button>
+                                                            </Link>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>

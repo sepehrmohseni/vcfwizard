@@ -1,8 +1,9 @@
 import { Head, Link } from '@inertiajs/react';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import {
     Table,
     TableBody,
@@ -23,6 +24,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 type Props = {
     recentImports: ImportRecord[];
     stats: DashboardStats;
+    subscribed: boolean;
 };
 
 function formatBytes(bytes: number): string {
@@ -44,7 +46,11 @@ function statusColor(status: string): string {
     }
 }
 
-export default function Dashboard({ recentImports, stats }: Props) {
+export default function Dashboard({ recentImports, stats, subscribed }: Props) {
+    const aiUsagePercent = stats.ai_rows_limit > 0
+        ? Math.min((stats.ai_rows_used / stats.ai_rows_limit) * 100, 100)
+        : 0;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
@@ -58,6 +64,28 @@ export default function Dashboard({ recentImports, stats }: Props) {
                         </Button>
                     </Link>
                 </div>
+
+                {!subscribed && (
+                    <Card className="border-blue-500/20 bg-gradient-to-r from-blue-50 to-violet-50 dark:from-blue-950/20 dark:to-violet-950/20">
+                        <CardContent className="flex items-center justify-between p-4">
+                            <div className="flex items-center gap-3">
+                                <Sparkles className="h-5 w-5 text-blue-600" />
+                                <div>
+                                    <p className="text-sm font-medium">Upgrade to Pro</p>
+                                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                                        Unlock AI mapping, unlimited contacts, integrations & more — $10/6mo
+                                    </p>
+                                </div>
+                            </div>
+                            <Link href="/billing">
+                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                                    Upgrade
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardHeader className="pb-2">
@@ -86,13 +114,23 @@ export default function Dashboard({ recentImports, stats }: Props) {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium text-neutral-500">
-                                This Month
+                                AI Rows Used
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-3xl font-bold">
-                                {(stats.contacts_this_month ?? 0).toLocaleString()}
-                            </p>
+                            {subscribed ? (
+                                <div className="space-y-2">
+                                    <p className="text-3xl font-bold">
+                                        {stats.ai_rows_used.toLocaleString()}
+                                    </p>
+                                    <Progress value={aiUsagePercent} className="h-1.5" />
+                                    <p className="text-xs text-neutral-400">
+                                        of {stats.ai_rows_limit.toLocaleString()}
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-neutral-400">Pro only</p>
+                            )}
                         </CardContent>
                     </Card>
                     <Card>

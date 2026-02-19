@@ -1,15 +1,6 @@
 import { motion } from 'framer-motion';
 import { AlertTriangle, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 
 type PreviewTableProps = {
     headers: string[];
@@ -61,15 +52,15 @@ export function PreviewTable({
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
             >
-                <ScrollArea className="h-[400px] rounded-xl border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-muted/50">
-                                <TableHead className="w-12 text-center">
+                <div className="h-[400px] overflow-y-auto rounded-xl border">
+                    <table className="w-full caption-bottom text-sm">
+                        <thead className="[&_tr]:border-b">
+                            <tr className="border-b bg-muted/50">
+                                <th className="h-10 w-12 px-4 text-center text-sm font-medium text-muted-foreground">
                                     #
-                                </TableHead>
+                                </th>
                                 {mappedHeaders.map((header) => (
-                                    <TableHead key={header}>
+                                    <th key={header} className="h-10 px-4 text-left align-middle text-sm font-medium text-muted-foreground">
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-xs font-semibold">
                                                 {header}
@@ -78,29 +69,29 @@ export function PreviewTable({
                                                 → {mapping[header]}
                                             </span>
                                         </div>
-                                    </TableHead>
+                                    </th>
                                 ))}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                            </tr>
+                        </thead>
+                        <tbody className="[&_tr:last-child]:border-0">
                             {rows.slice(0, 50).map((row, index) => (
-                                <TableRow key={index}>
-                                    <TableCell className="text-center text-xs text-muted-foreground">
+                                <tr key={index} className="border-b transition-colors hover:bg-muted/50">
+                                    <td className="p-4 text-center text-xs text-muted-foreground">
                                         {index + 1}
-                                    </TableCell>
+                                    </td>
                                     {mappedHeaders.map((header) => (
-                                        <TableCell
+                                        <td
                                             key={header}
-                                            className="max-w-[200px] truncate text-xs"
+                                            className="max-w-[200px] truncate p-4 text-xs"
                                         >
                                             {row[header] || '—'}
-                                        </TableCell>
+                                        </td>
                                     ))}
-                                </TableRow>
+                                </tr>
                             ))}
-                        </TableBody>
-                    </Table>
-                </ScrollArea>
+                        </tbody>
+                    </table>
+                </div>
             </motion.div>
 
             {totalRows > 50 && (

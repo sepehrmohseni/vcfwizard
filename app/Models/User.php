@@ -7,20 +7,19 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Cashier\Billable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable
 {
-    use HasFactory, HasUlids, Notifiable, TwoFactorAuthenticatable;
+    use Billable, HasFactory, HasUlids, Notifiable, TwoFactorAuthenticatable;
 
     protected $fillable = [
         'name',
         'email',
         'password',
-        'stripe_customer_id',
-        'subscription_status',
-        'contacts_processed_this_month',
-        'current_period_started_at',
+        'ai_rows_used',
+        'ai_usage_reset_at',
     ];
 
     protected $hidden = [
@@ -28,7 +27,7 @@ class User extends Authenticatable
         'two_factor_secret',
         'two_factor_recovery_codes',
         'remember_token',
-        'stripe_customer_id',
+        'stripe_id',
     ];
 
     protected function casts(): array
@@ -37,8 +36,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
-            'contacts_processed_this_month' => 'integer',
-            'current_period_started_at' => 'datetime',
+            'ai_rows_used' => 'integer',
+            'ai_usage_reset_at' => 'datetime',
         ];
     }
 
@@ -57,18 +56,58 @@ class User extends Authenticatable
         return $this->hasMany(MappingTemplate::class);
     }
 
+    public function integrations(): HasMany
+    {
+        return $this->hasMany(Integration::class);
+    }
+
+    public function webhooks(): HasMany
+    {
+        return $this->hasMany(Webhook::class);
+    }
+
+    public function apiKeys(): HasMany
+    {
+        return $this->hasMany(ApiKey::class);
+    }
+
     public function isPro(): bool
     {
-        return $this->subscription_status === 'pro';
+        return $this->subscribed('pro');
     }
 
     public function isFreePlan(): bool
     {
-        return $this->subscription_status === 'free';
+        return ! $this->isPro();
     }
 
     public function getContactLimitAttribute(): int
     {
         return $this->isPro() ? PHP_INT_MAX : 2000;
+    }
+
+    public function getAiRowsLimitAttribute(): int
+    {
+        return $this->isPro() ? 50000 : 0;
+    }
+
+    public function canUseAi(): bool
+    {
+        return $this->isPro() && $this->ai_rows_used < $this->ai_rows_limit;
+    }
+
+    public function incrementAiUsage(int $rows): void
+    {
+        $this->increment('ai_rows_used', $rows);
+    }
+
+    public function resetAiUsageIfNeeded(): void
+    {
+        if (! $this->ai_usage_reset_at || $this->ai_usage_reset_at->isPast()) {
+            $this->update([
+                'ai_rows_used' => 0,
+                'ai_usage_reset_at' => now()->addMonth(),
+            ]);
+        }
     }
 }

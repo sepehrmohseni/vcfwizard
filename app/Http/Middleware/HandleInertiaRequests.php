@@ -35,11 +35,13 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user() ? $request->user()->only([
+                'user' => $user ? $user->only([
                     'id',
                     'name',
                     'email',
@@ -47,8 +49,10 @@ class HandleInertiaRequests extends Middleware
                     'email_verified_at',
                     'two_factor_confirmed_at',
                 ]) : null,
+                'subscribed' => $user?->isPro() ?? false,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'stripeKey' => config('services.stripe.key'),
         ];
     }
 }

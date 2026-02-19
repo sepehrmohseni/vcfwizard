@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\Import;
 use App\Models\MappingTemplate;
+use App\Models\Subscription;
+use App\Models\SubscriptionItem;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Registered;
@@ -12,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Cashier\Cashier;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configureCashier();
         $this->configureGuestImportClaiming();
     }
 
@@ -54,6 +58,12 @@ class AppServiceProvider extends ServiceProvider
         );
     }
 
+    protected function configureCashier(): void
+    {
+        Cashier::useSubscriptionModel(Subscription::class);
+        Cashier::useSubscriptionItemModel(SubscriptionItem::class);
+    }
+
     protected function configureGuestImportClaiming(): void
     {
         $claimImports = function (Login|Registered $event): void {
@@ -77,14 +87,15 @@ class AppServiceProvider extends ServiceProvider
 
                 if (! empty($import->mapped_fields)) {
                     $exists = MappingTemplate::where('user_id', $event->user->id)
-                        ->where('mapping', json_encode($import->mapped_fields))
-                        ->exists();
+                        ->get()
+                        ->contains(fn (MappingTemplate $t) => $t->mapping == $import->mapped_fields);
 
                     if (! $exists) {
                         MappingTemplate::create([
                             'user_id' => $event->user->id,
                             'name' => pathinfo($import->original_filename, PATHINFO_FILENAME),
                             'mapping' => $import->mapped_fields,
+                            'usage_count' => 1,
                         ]);
                     }
                 }

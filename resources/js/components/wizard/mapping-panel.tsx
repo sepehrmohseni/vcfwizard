@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Wand2, Loader2, ChevronDown } from 'lucide-react';
+import { Wand2, Loader2, ChevronDown, Lock } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ type MappingPanelProps = {
     onApply: () => void;
     isApplying: boolean;
     previewRows: Record<string, string>[];
+    canUseAi?: boolean;
 };
 
 export function MappingPanel({
@@ -30,6 +31,7 @@ export function MappingPanel({
     onApply,
     isApplying,
     previewRows,
+    canUseAi = true,
 }: MappingPanelProps) {
     const [expandedColumn, setExpandedColumn] = useState<string | null>(null);
 
@@ -67,13 +69,20 @@ export function MappingPanel({
                 </div>
                 <Button
                     onClick={onAutoMap}
-                    disabled={isLoadingAi}
+                    disabled={isLoadingAi || !canUseAi}
                     className="gap-2"
+                    title={!canUseAi ? 'Pro subscription required' : undefined}
                 >
                     {isLoadingAi ? (
                         <>
                             <Loader2 className="h-4 w-4 animate-spin" />
                             Analyzing...
+                        </>
+                    ) : !canUseAi ? (
+                        <>
+                            <Lock className="h-4 w-4" />
+                            AI Auto-Map
+                            <Badge variant="secondary" className="ml-1 text-[10px]">Pro</Badge>
                         </>
                     ) : (
                         <>

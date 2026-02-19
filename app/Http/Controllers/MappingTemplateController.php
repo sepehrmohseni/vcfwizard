@@ -13,8 +13,10 @@ class MappingTemplateController extends Controller
 {
     public function index(Request $request): Response
     {
-        $templates = MappingTemplate::where('user_id', $request->user()->id)
-            ->orWhere('is_public', true)
+        $templates = MappingTemplate::where(function ($query) use ($request) {
+            $query->where('user_id', $request->user()->id)
+                ->orWhere('is_public', true);
+        })
             ->latest()
             ->paginate(20);
 
